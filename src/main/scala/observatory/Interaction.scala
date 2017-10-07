@@ -62,7 +62,35 @@ object Interaction {
 
   def tile(temperatures: Iterable[(Location, Double)], colors: Iterable[(Double, Color)],
            zoom: Int, x: Int, y: Int, tileSize: Int): Image = {
-    AkkaAdapter().tile(temperatures, colors, zoom, x, y, tileSize)
+    def seqOp(aggregator: Map[Int, Pixel], element: (Int, Location)): Map[Int, Pixel] = {
+      val index = element._1
+      val location = element._2
+
+      val temperature = predictTemperature(temperatures, location)
+      val color = interpolateColor(colors, temperature)
+      aggregator + (index -> Pixel(color.red, color.green, color.blue, 127))
+    }
+
+    def combOp(arr1: Map[Int, Pixel], arr2: Map[Int, Pixel]): Map[Int, Pixel] = arr1 ++ arr2
+
+    val location = tileLocation(zoom, x, y)
+    val (zoomedX, zoomedY) = toTileXY(zoom + 8, location)
+
+    val length = tileSize * tileSize
+    val initialArray: Array[(Int, Location)] = new Array[(Int, Location)](length)
+    for (i <- 0 until tileSize) {
+      val ty = zoomedY + i
+      for (j <- 0 until tileSize) {
+        val index = i * tileSize + j
+        val tx = zoomedX + j
+        initialArray(index) = (index, tileLocation(zoom + 8, tx, ty))
+      }
+    }
+
+    val map = initialArray.par.aggregate(Map[Int, Pixel]())(seqOp, combOp)
+    val pixels = new Array[Pixel](length)
+    for (i <- pixels.indices) pixels(i) = map(i)
+    Image(tileSize, tileSize, pixels)
   }
 
   def generateTiles[Data](yearlyData: Iterable[(Int, Data)], zoomAndTiles: Seq[(Int, Array[(Int, Int)])],

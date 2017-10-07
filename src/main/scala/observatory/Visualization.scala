@@ -1,6 +1,6 @@
 package observatory
 
-import com.sksamuel.scrimage.Image
+import com.sksamuel.scrimage.{Image, Pixel}
 import org.apache.commons.math3.util.FastMath._
 
 /**
@@ -38,7 +38,7 @@ object Visualization {
       (aggregator1._1 + aggregator2._1, aggregator1._2 + aggregator2._2, minTemperature)
     }
 
-    val (numeratorSum, denominatorSum, minTemperature) = temperatures.par.aggregate((0.0, 0.0, Double.PositiveInfinity))(seqOp, combOp)
+    val (numeratorSum, denominatorSum, minTemperature) = temperatures.aggregate((0.0, 0.0, Double.PositiveInfinity))(seqOp, combOp)
     if (!minTemperature.isPosInfinity) minTemperature
     else numeratorSum / denominatorSum
   }
@@ -64,7 +64,28 @@ object Visualization {
     * @return A 360×180 image where each pixel shows the predicted temperature at its location
     */
   def visualize(temperatures: Iterable[(Location, Double)], colors: Iterable[(Double, Color)]): Image = {
-    AkkaAdapter().visualize(temperatures, colors, WIDTH, HEIGHT)
+    def seqOp(aggregator: Map[Int, Pixel], element: (Int, Location)): Map[Int, Pixel] = {
+      val index = element._1
+      val location = element._2
+
+      val temperature = predictTemperature(temperatures, location)
+      val color = interpolateColor(colors, temperature)
+      aggregator + (index -> Pixel(color.red, color.green, color.blue, 255))
+    }
+
+    def combOp(arr1: Map[Int, Pixel], arr2: Map[Int, Pixel]): Map[Int, Pixel] = arr1 ++ arr2
+
+    val arr: Array[(Int, Location)] = new Array[(Int, Location)](LENGTH)
+    for (x <- 0 until WIDTH) {
+      for (y <- 0 until HEIGHT) {
+        val index = y * WIDTH + x
+        arr(index) = (index, Location(yOrigin - y, x - xOrigin))
+      }
+    }
+    val map = arr.par.aggregate(Map[Int, Pixel]())(seqOp, combOp)
+    val pixels = new Array[Pixel](LENGTH)
+    for (i <- pixels.indices) pixels(i) = map(i)
+    Image(WIDTH, HEIGHT, pixels)
   }
 
   private def interpolateColorRecursive(points: Iterable[(Double, Color)], value: Double): Color = {

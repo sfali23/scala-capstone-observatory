@@ -26,7 +26,22 @@ object Manipulation {
     *         returns the predicted temperature at this location
     */
   def makeGrid(temperatures: Iterable[(Location, Double)]): (Int, Int) => Double = {
-    AkkaAdapter().makeGrid(WIDTH, HEIGHT, temperatures)
+    def seqOp(grid: Grid, location: Location): Grid = {
+      val temperature = Visualization.predictTemperature(temperatures, location)
+      grid + (location.lat.toInt, location.lon.toInt, temperature)
+    }
+
+    def combOp(grid1: Grid, grid2: Grid): Grid = grid1 ++ grid2
+
+    val arr: Array[Location] = new Array[Location](LENGTH)
+    for (x <- 0 until WIDTH) {
+      for (y <- 0 until HEIGHT) {
+        val index = y * WIDTH + x
+        arr(index) = Location(yOrigin - y, x - xOrigin)
+      }
+    }
+    val grid = arr.par.aggregate(new Grid)(seqOp, combOp)
+    grid.temperature
   }
 
   /**

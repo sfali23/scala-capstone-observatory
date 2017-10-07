@@ -1,24 +1,8 @@
 package observatory
 
-import com.sksamuel.scrimage.Pixel
-
 case class Location(lat: Double, lon: Double)
 
 case class Color(red: Int, green: Int, blue: Int)
-
-case class StartInterpolateColor(alpha: Int)
-
-case class StartTileGeneration(zoom: Int, x: Int, y: Int, alpha: Int)
-
-case class StartMakeGrid()
-
-case class InterpolateColorWork(index: Int, location: Location, alpha: Int)
-
-case class MakeGridWork(location: Location)
-
-case class ComputedPixel(index: Int, pixel: Pixel)
-
-case class ComputedTemperature(location: Location, temperature: Double)
 
 class Grid {
 
