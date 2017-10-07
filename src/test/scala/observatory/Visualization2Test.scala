@@ -29,12 +29,7 @@ trait Visualization2Test extends FunSuite with Checkers {
     val deviations: (Int, Int) => Double = deviation(knownTemperatures2, averages)
     val image = visualizeGrid(deviations, colorScales, 0, 1, 1)
 
-    val gpsCoordinates = new Array[Location](LENGTH)
-    for (x <- 0 until WIDTH) {
-      for (y <- 0 until HEIGHT) {
-        gpsCoordinates(y * WIDTH + x) = Location(yOrigin - y, x - xOrigin)
-      }
-    }
+    val gpsCoordinates = getLocations.toSeq
 
     println(s"($t1, $t2)")
     println(s"($l1, $l2)")

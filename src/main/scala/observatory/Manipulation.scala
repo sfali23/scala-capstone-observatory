@@ -14,12 +14,6 @@ object Manipulation {
   private[observatory] val LONGITUDE_START = -180
   private[observatory] val LONGITUDE_END = 179
 
-  private[observatory] val WIDTH = 360
-  private[observatory] val HEIGHT = 180
-  private[observatory] val LENGTH = WIDTH * HEIGHT
-  private[observatory] val xOrigin = 180
-  private[observatory] val yOrigin = 90
-
   /**
     * @param temperatures Known temperatures
     * @return A function that, given a latitude in [-89, 90] and a longitude in [-180, 179],
@@ -33,14 +27,7 @@ object Manipulation {
 
     def combOp(grid1: Grid, grid2: Grid): Grid = grid1 ++ grid2
 
-    val arr: Array[Location] = new Array[Location](LENGTH)
-    for (x <- 0 until WIDTH) {
-      for (y <- 0 until HEIGHT) {
-        val index = y * WIDTH + x
-        arr(index) = Location(yOrigin - y, x - xOrigin)
-      }
-    }
-    val grid = arr.par.aggregate(new Grid)(seqOp, combOp)
+    val grid = getLocations.par.aggregate(Grid())(seqOp, combOp)
     grid.temperature
   }
 
@@ -54,15 +41,13 @@ object Manipulation {
 
   private def averageInternal(grids: Iterable[(Int, Int) => Double]): (Int, Int) => Double = {
     val averages = for {
-      x <- 0 until WIDTH
-      y <- 0 until HEIGHT
-      lat = yOrigin - y
-      lon = x - xOrigin
+      lat <- LATITUDE_START to LATITUDE_END
+      lon <- LONGITUDE_START to LONGITUDE_END
       ls = grids.map(_ (lat, lon))
       avg = ls.sum / ls.size
     } yield (lat, lon, avg)
 
-    val gridOfAverages = averages.foldLeft(new Grid) {
+    val gridOfAverages = averages.foldLeft(Grid()) {
       case (grid, (lat, lon, avg)) => grid + (lat, lon, avg)
     }
 
@@ -78,18 +63,23 @@ object Manipulation {
     val grid = makeGrid(temperatures)
 
     val latLongSeq = for {
-      x <- 0 until WIDTH
-      y <- 0 until HEIGHT
-      lat = yOrigin - y
-      lon = x - xOrigin
+      lat <- LATITUDE_START to LATITUDE_END
+      lon <- LONGITUDE_START to LONGITUDE_END
     } yield (lat, lon)
 
-    val gridOfDeviations = latLongSeq.foldLeft(new Grid) {
+    val gridOfDeviations = latLongSeq.foldLeft(Grid()) {
       case (g, (lat, lon)) => g + (lat, lon, grid(lat, lon) - normals(lat, lon))
     }
 
     gridOfDeviations.temperature
   }
+
+  private[observatory] def getLocations: Iterable[Location] =
+    for {
+      y <- LATITUDE_START to LATITUDE_END
+      x <- LONGITUDE_START to LONGITUDE_END
+      location = Location(y, x)
+    } yield location
 
   private[observatory] def readAverage: (Int, Int) => Double =
     readGrid(1111)(Paths.get("data", "1111.csv"))
@@ -117,17 +107,15 @@ object Manipulation {
   private def readGrid(year: Int)(path: Path): (Int, Int) => Double = {
     Files.readAllLines(path)
       .asScala.toList.map(_.split(","))
-      .foldLeft(new Grid) {
+      .foldLeft(Grid()) {
         case (g, array) => g + (array(0).toInt, array(1).toInt, array(2).toDouble)
       }.temperature
   }
 
   private def saveData(path: Path, grid: (Int, Int) => Double): Path = {
     val latLongSeq = for {
-      x <- 0 until WIDTH
-      y <- 0 until HEIGHT
-      lat = yOrigin - y
-      lon = x - xOrigin
+      lat <- LATITUDE_START to LATITUDE_END
+      lon <- LONGITUDE_START to LONGITUDE_END
       temp = grid(lat, lon)
     } yield (lat, lon, temp)
 

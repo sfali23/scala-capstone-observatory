@@ -10,16 +10,9 @@ trait ManipulationTest extends FunSuite with Checkers {
   test("makeGrid must return a grid whose predicted temperatures are consistent with the known temperatures") {
     val (temperatures, locations, knownTemperatures) = getTemperaturesLocations
 
-    val gpsCoordinates = new Array[Location](LENGTH)
-    for (x <- 0 until WIDTH) {
-      for (y <- 0 until HEIGHT) {
-        gpsCoordinates(y * WIDTH + x) = Location(yOrigin - y, x - xOrigin)
-      }
-    }
-
     val fun = makeGrid(knownTemperatures)
 
-    gpsCoordinates.foreach(location =>
+    getLocations.foreach(location =>
       validateMakeGrid(locations, temperatures, location, fun(location.lat.toInt, location.lon.toInt))
     )
   }
