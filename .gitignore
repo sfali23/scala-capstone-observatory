@@ -1,0 +1,74 @@
+
+# Created by https://www.gitignore.io/api/scala,intellij,sbt
+
+### Intellij ###
+.idea/
+
+## File-based project format:
+*.iws
+
+## Plugin-specific files:
+
+# IntelliJ
+/out/
+
+# mpeltonen/sbt-idea plugin
+.idea_modules/
+
+# JIRA plugin
+atlassian-ide-plugin.xml
+
+# Crashlytics plugin (for Android Studio and IntelliJ)
+com_crashlytics_export_strings.xml
+crashlytics.properties
+crashlytics-build.properties
+fabric.properties
+
+### Intellij Patch ###
+# Comment Reason: https://github.com/joeblau/gitignore.io/issues/186#issuecomment-215987721
+
+*.iml
+# modules.xml
+.idea
+# *.ipr
+
+### SBT ###
+# Simple Build Tool
+# http://www.scala-sbt.org/release/docs/Getting-Started/Directories.html#configuring-version-control
+
+target/
+lib_managed/
+src_managed/
+project/boot/
+project/target/
+.history
+.cache
+
+### Scala ###
+*.class
+*.log
+
+# sbt specific
+.lib/
+dist/*
+project/plugins/project/
+project/target/**/
+
+# Scala-IDE specific
+.ensime
+.ensime_cache/
+.scala_dependencies
+.worksheet
+
+# ENSIME specific
+
+# End of https://www.gitignore.io/api/scala,intellij,sbt
+
+src/main/resources/*.csv
+data/*
+images/*
+grades/*
+spark-warehouse/*
+*.txt
+*.sc
+docs/*

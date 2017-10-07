@@ -1,0 +1,104 @@
+def predictTemperature(temperatures: Iterable[(Location, Double)], location: Location): Double = {
+    def seqOp(aggregator: (Double, Double, Double), element: (Location, Double)): (Double, Double, Double) = {
+      val gcd = greatestCircleDistance(element._1, location)
+      val _pow = pow(gcd, POWER)
+      val numeratorSum = (element._2 / _pow) + aggregator._1
+      val denominatorSum = (1 / _pow) + aggregator._2
+      val minTemperature = if (gcd < 1.0) element._2 else aggregator._3
+      (numeratorSum, denominatorSum, minTemperature)
+    }
+
+    def combOp(aggregator1: (Double, Double, Double), aggregator2: (Double, Double, Double)): (Double, Double, Double) = {
+      val minTemperature = if (!aggregator1._3.isPosInfinity) aggregator1._3
+      else aggregator2._3
+      (aggregator1._1 + aggregator2._1, aggregator1._2 + aggregator2._2, minTemperature)
+    }
+
+    // val parTemperatures = temperatures.toStream.par
+    val (numeratorSum, denominatorSum, minTemperature) = temperatures.par.aggregate((0.0, 0.0, Double.PositiveInfinity))(seqOp, combOp)
+    if (!minTemperature.isPosInfinity) minTemperature
+    else numeratorSum / denominatorSum
+  }
+
+  val router = system.actorOf(MasterActor.props(temperatures, List()))
+      val assembler = system.actorOf(DispatcherActor.props(router, temperatures.size, 1))
+
+      val future = assembler ? StartPredictTemperature(temperatures, location)
+      val result = Await.result(future, timeout.duration).asInstanceOf[Double]
+      result
+
+  def visualize(temperatures: Iterable[(Location, Double)], colors: Iterable[(Double, Color)]): Image = {
+      def seqOp(aggregator: Map[Int, Pixel], element: (Int, Location)): Map[Int, Pixel] = {
+        val index = element._1
+        val location = element._2
+
+        val temperature = predictTemperature(temperatures, location)
+        val color = interpolateColor(colors, temperature)
+        aggregator + (index -> Pixel(color.red, color.green, color.blue, 255))
+      }
+
+      def combOp(arr1: Map[Int, Pixel], arr2: Map[Int, Pixel]): Map[Int, Pixel] = arr1 ++ arr2
+
+      val arr: Array[(Int, Location)] = new Array[(Int, Location)](LENGTH)
+      for (x <- 0 until WIDTH) {
+        for (y <- 0 until HEIGHT) {
+          val index = y * WIDTH + x
+          arr(index) = (index, Location(yOrigin - y, x - xOrigin))
+        }
+      }
+      val map = arr.par.aggregate(Map[Int, Pixel]())(seqOp, combOp)
+      val pixels = new Array[Pixel](LENGTH)
+      for (i <- pixels.indices) pixels(i) = map(i)
+      Image(WIDTH, HEIGHT, pixels)
+    }
+
+    def tile(temperatures: Iterable[(Location, Double)], colors: Iterable[(Double, Color)],
+               zoom: Int, x: Int, y: Int, tileSize: Int): Image = {
+        def seqOp(aggregator: Map[Int, Pixel], element: (Int, Location)): Map[Int, Pixel] = {
+          val index = element._1
+          val location = element._2
+
+          val temperature = predictTemperature(temperatures, location)
+          val color = interpolateColor(colors, temperature)
+          aggregator + (index -> Pixel(color.red, color.green, color.blue, 127))
+        }
+
+        def combOp(arr1: Map[Int, Pixel], arr2: Map[Int, Pixel]): Map[Int, Pixel] = arr1 ++ arr2
+
+        val location = tileLocation(zoom, x, y)
+        val (zoomedX, zoomedY) = toTileXY(zoom + 8, location)
+
+        val length = tileSize * tileSize
+        val initialArray: Array[(Int, Location)] = new Array[(Int, Location)](length)
+        for (i <- 0 until tileSize) {
+          val ty = zoomedY + i
+          for (j <- 0 until tileSize) {
+            val index = i * tileSize + j
+            val tx = zoomedX + j
+            initialArray(index) = (index, tileLocation(zoom + 8, tx, ty))
+          }
+        }
+
+        val map = initialArray.par.aggregate(Map[Int, Pixel]())(seqOp, combOp)
+        val pixels = new Array[Pixel](length)
+        for (i <- pixels.indices) pixels(i) = map(i)
+        Image(tileSize, tileSize, pixels)
+      }
+
+      def makeGrid(temperatures: Iterable[(Location, Double)]): (Int, Int) => Double = {
+          def seqOp(grid: Grid, location: Location): Grid = {
+            val temperature = predictTemperature(temperatures, location)
+            grid + (location.lat.toInt, location.lon.toInt, temperature)
+          }
+
+          def combOp(grid1: Grid, grid2: Grid): Grid = grid1 ++ grid2
+
+          val arr: Array[Location] = new Array[Location](LENGTH)
+          for (x <- 0 until WIDTH) {
+            for (y <- 0 until HEIGHT) {
+              val index = y * WIDTH + x
+              arr(index) = Location(yOrigin - y, x - xOrigin)
+            }
+          }
+          val grid = arr.par.aggregate(new Grid)(seqOp, combOp)
+          grid.temp
